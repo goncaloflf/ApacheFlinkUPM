@@ -35,7 +35,7 @@ import org.apache.flink.util.Collector;
  * <li>use Tuple data types.
  * <li>write and use user-defined functions.
  * </ul>
- *
+
  */
 public class WordCount {
 
