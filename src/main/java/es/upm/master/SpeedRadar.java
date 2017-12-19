@@ -16,11 +16,11 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
 import org.apache.flink.util.Collector;
 
-public class firsttry {
+public class SpeedRadar {
 
     public static void main(String[] args)  throws Exception {
 
-        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(1);
+        final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
         String	inFilePath = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\traffic-3xways";
         String	outFilePath = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\output.txt";
@@ -50,7 +50,7 @@ public class firsttry {
             }
         });
 
-        speedRadar.writeAsCsv(outFilePath, FileSystem.WriteMode.OVERWRITE);
+        speedRadar.writeAsCsv(outFilePath, FileSystem.WriteMode.OVERWRITE).setParallelism(1);
         env.execute();
     }
 }
