@@ -26,10 +26,16 @@ public class VehicleTelematics {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(10);
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        String	inFilePath = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\test_input.csv";
-        String	outFilePathRadar = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\speedfines_test.csv";
-        String	outFilePathAccident = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\accidents_test.csv";
-        String	outFilePathAverage = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\avgspeedfines_test.csv";
+        //String	inFilePath = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\test_input.csv";
+        String inFilePath = "";
+        try {
+            inFilePath = args[0];
+        } catch (IndexOutOfBoundsException e) {
+            System.out.println("Input file path must be provided as argument to this program. Aborting...");
+        }
+        String	outFilePathRadar = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\speedfines.csv";
+        String	outFilePathAccident = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\accidents.csv";
+        String	outFilePathAverage = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\avgspeedfines.csv";
         DataStream<String> source = env.readTextFile(inFilePath).setParallelism(1);
 
         //Splits the lines by commas, discards the lines with speed under 91. Parses the String to a tuple of integers.
