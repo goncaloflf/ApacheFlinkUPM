@@ -26,16 +26,18 @@ public class VehicleTelematics {
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(10);
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        //String	inFilePath = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\test_input.csv";
         String inFilePath = "";
+        String outFilePath = "";
         try {
             inFilePath = args[0];
+            outFilePath = args[1];
         } catch (IndexOutOfBoundsException e) {
-            System.out.println("Input file path must be provided as argument to this program. Aborting...");
+            System.out.println("Input file and output folder path must be provided as argument to this program. Aborting...");
+            return;
         }
-        String	outFilePathRadar = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\speedfines.csv";
-        String	outFilePathAccident = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\accidents.csv";
-        String	outFilePathAverage = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\avgspeedfines.csv";
+        String	outFilePathRadar = outFilePath +  "/speedfines.csv";
+        String	outFilePathAccident = outFilePath + "/accidents.csv";
+        String	outFilePathAverage = outFilePath + "/avgspeedfines.csv";
         DataStream<String> source = env.readTextFile(inFilePath).setParallelism(1);
 
         //Splits the lines by commas, discards the lines with speed under 91. Parses the String to a tuple of integers.
