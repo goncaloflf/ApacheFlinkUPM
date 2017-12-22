@@ -34,34 +34,32 @@ public class SpeedRadar {
     public static void main(String[] args)  throws Exception {
 
         final StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment().setParallelism(10);
+        env.getConfig().disableSysoutLogging();
 
-        String	inFilePath = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\traffic-3xways";
-        String	outFilePathRadar = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\speedfines.csv";
-        String	outFilePathAccident = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\accidents.csv";
+        String	inFilePath = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\test_input.csv";
+        String	outFilePathRadar = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\speedfines_test.csv";
+        String	outFilePathAccident = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\accidents_test.csv";
         String	outFilePathAverage = "C:\\Users\\Goncalo\\IdeaProjects\\flinkPr\\projectFlink\\avgspeedfines.csv";
         DataStream<String> source = env.readTextFile(inFilePath).setParallelism(1);
 
-        Map<Integer, ArrayList<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>> samePos = new HashMap<>();
-
         //Splits the lines by commas, discards the lines with speed under 91. Parses the String to a tuple of integers.
-        SingleOutputStreamOperator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> speedRadar = source.filter(new FilterFunction<String>() {
+        SingleOutputStreamOperator<Tuple6<Integer, Integer, Integer, Integer, Integer, Integer>> speedRadar = source.filter(new FilterFunction<String>() {
             @Override
             public boolean filter(String value) {
                 String[] s = value.split(",");
                 int speed = Integer.parseInt(s[2]);
                 return speed > 90;
             }
-        }).map(new MapFunction<String, Tuple8<Integer,Integer,Integer,Integer,Integer,Integer,Integer,Integer>>() {
+        }).map(new MapFunction<String, Tuple6<Integer,Integer,Integer,Integer,Integer,Integer>>() {
             @Override
-            public Tuple8<Integer,Integer,Integer,Integer,Integer,Integer,Integer,Integer> map(String value) {
+            public Tuple6<Integer,Integer,Integer,Integer,Integer,Integer> map(String value) {
                 String[] s = value.split(",");
-                return new Tuple8<>(Integer.parseInt(s[0]),Integer.parseInt(s[1]),Integer.parseInt(s[2]),
-                        Integer.parseInt(s[3]),Integer.parseInt(s[4]),Integer.parseInt(s[5]),Integer.parseInt(s[6]),
-                        Integer.parseInt(s[7]));
+                return new Tuple6<>(Integer.parseInt(s[0]),Integer.parseInt(s[1]),Integer.parseInt(s[3]),
+                        Integer.parseInt(s[6]),Integer.parseInt(s[5]),Integer.parseInt(s[2]));
             }
-        }).assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
+        }).assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple6<Integer, Integer, Integer, Integer, Integer, Integer>>() {
             @Override
-            public long extractAscendingTimestamp(Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer> element) {
+            public long extractAscendingTimestamp(Tuple6<Integer, Integer, Integer, Integer, Integer, Integer> element) {
                 return element.f0 * 1000;
             }
         });
@@ -98,7 +96,7 @@ public class SpeedRadar {
                 .window(EventTimeSessionWindows.withGap(Time.seconds(30)))
                 .apply(new averageSpeedFunction());
 
-        KeyedStream<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>, Tuple> keyedAccident =  source
+        SingleOutputStreamOperator<Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>> accidentReporter =  source
                 .map(new MapFunction<String, Tuple8<Integer,Integer,Integer,Integer,Integer,Integer,Integer,Integer>>() {
                     @Override
                     public Tuple8<Integer,Integer,Integer,Integer,Integer,Integer,Integer,Integer> map(String value) {
@@ -107,21 +105,19 @@ public class SpeedRadar {
                                 Integer.parseInt(s[3]),Integer.parseInt(s[4]),Integer.parseInt(s[5]),Integer.parseInt(s[6]),
                                 Integer.parseInt(s[7]));
                     }
-                })
+                }).setParallelism(1)
                 .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
                     @Override
                     public long extractAscendingTimestamp(Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer> element) {
                         return element.f0 * 1000;
                     }
-                })
-                .keyBy(1,7);
-
-        SingleOutputStreamOperator<Object> accidentReporter = keyedAccident.window(SlidingEventTimeWindows.of(Time.seconds(120), Time.seconds(30))).apply(new AccidentChecker()).setParallelism(1);
+                }).setParallelism(1)
+                .keyBy(1,7).countWindow(4,1).apply(new AccidentChecker()).setParallelism(1);
 
 
-        speedRadar.writeAsCsv(outFilePathRadar, FileSystem.WriteMode.OVERWRITE);
+        speedRadar.writeAsCsv(outFilePathRadar, FileSystem.WriteMode.OVERWRITE).setParallelism(1);
         AvgSpeedControl.writeAsCsv(outFilePathAverage, FileSystem.WriteMode.OVERWRITE);
-        accidentReporter.writeAsText(outFilePathAccident, FileSystem.WriteMode.OVERWRITE);
+        accidentReporter.writeAsCsv(outFilePathAccident, FileSystem.WriteMode.OVERWRITE).setParallelism(1);
         env.execute();
     }
 
@@ -170,27 +166,27 @@ public class SpeedRadar {
         }
     }
 
-    private static class AccidentChecker implements WindowFunction<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>, Object, Tuple, TimeWindow> {
+    private static class AccidentChecker implements WindowFunction<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>, Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>, Tuple, GlobalWindow> {
         @Override
-        public void apply(Tuple tuple, TimeWindow timeWindow, Iterable<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> iterable, Collector<Object> collector) throws Exception {
-            int count = 0, lastPos = 0;
-            for(Tuple8 element: iterable) {
-                if(count == 0) {
-                    lastPos = (int) element.f7;
-                    count = 1;
-                    continue;
+        public void apply(Tuple tuple, GlobalWindow globalWindow, Iterable<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> iterable, Collector<Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>> collector) throws Exception {
+            Iterator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> aux = iterable.iterator();
+            int time1 = 0, time2 = 0, vid = 0, xway = 0, seg = 0, dir = 0, pos = 0;
+            int cont = 0;
+            for(Tuple8 item : iterable) {
+                if(cont == 0) {
+                    time1 = (int) item.f0;
+                } else if(cont == 3) {
+                    time2 = (int) item.f0;
+                    vid = (int) item.f1;
+                    xway = (int) item.f3;
+                    seg = (int) item.f6;
+                    dir = (int) item.f5;
+                    pos = (int) item.f7;
                 }
-                int currPos = (int) element.f7;
-                if(currPos == lastPos) {
-                    count += 1;
-                    if(count >= 4) {
-                        collector.collect(new Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>(
-                                (int) element.f0 - 120, (int) element.f0, (int) element.f1, (int) element.f3, (int) element.f5, (int) element.f6, (int) element.f7));
-                    }
-                } else {
-                    count = 0;
-                    lastPos = 0;
-                }
+                cont++;
+            }
+            if(cont == 4) {
+                collector.collect(new Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>(time1, time2, vid, xway, seg, dir, pos));
             }
         }
     }
