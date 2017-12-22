@@ -292,7 +292,7 @@ under the License.
 							<!--
 							<transformers>
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-									<mainClass>es.upm.master.StreamingJob</mainClass>
+									<mainClass>master2017.flinknk.master.StreamingJob</mainClass>
 								</transformer>
 							</transformers>
 						    -->

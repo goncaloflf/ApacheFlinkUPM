@@ -1,4 +1,4 @@
-package es.upm.master;
+package master2017.flink;
 
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -19,7 +19,7 @@ import java.util.*;
 
 //INPUT FORMAT: Time, VID, Spd, XWay, Lane, Dir, Seg, Pos
 
-public class SpeedRadar {
+public class VehicleTelematics {
 
     public static void main(String[] args)  throws Exception {
 
