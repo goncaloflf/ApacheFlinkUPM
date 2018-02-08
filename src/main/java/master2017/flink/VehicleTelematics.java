@@ -101,13 +101,19 @@ public class VehicleTelematics {
                                 Integer.parseInt(s[7]));
                     }
                 }).setParallelism(1)
-                .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
+                .filter(new FilterFunction<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>>() {
                     @Override
-                    public long extractAscendingTimestamp(Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer> element) {
-                        return element.f0 * 1000;
+                    public boolean filter(Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer> tuple) throws Exception {
+                        int speed = tuple.f2;
+                        if (speed == 0)
+                            return true;
+                        else
+                            return false;
                     }
-                }).setParallelism(1)
-                .keyBy(1,7).countWindow(4,1).apply(new AccidentChecker()).setParallelism(1);
+                })
+                .keyBy(1,7)
+                .countWindow(4,1)
+                .apply(new AccidentChecker()).setParallelism(1);
 
         speedRadar.writeAsCsv(outFilePathRadar, FileSystem.WriteMode.OVERWRITE).setParallelism(1);
         AvgSpeedControl.writeAsCsv(outFilePathAverage, FileSystem.WriteMode.OVERWRITE).setParallelism(1);
@@ -164,7 +170,23 @@ public class VehicleTelematics {
     private static class AccidentChecker implements WindowFunction<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>, Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>, Tuple, GlobalWindow> {
         @Override
         public void apply(Tuple tuple, GlobalWindow globalWindow, Iterable<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> iterable, Collector<Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>> collector) throws Exception {
-            Iterator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> aux = iterable.iterator();
+            List<Integer> timestamp = new ArrayList<Integer>();
+            int max = 0, min = 0, vid = 0 , xway = 0, seg = 0, dir = 0, pos = 0 ;
+            for (Tuple8 element : iterable) {
+                timestamp.add((int) element.f0);
+                vid = (int) element.f1;
+                xway = (int) element.f3;
+                seg = (int) element.f6;
+                dir = (int) element.f5;
+                pos = (int) element.f7;
+            }
+            if (timestamp.size() == 4) {
+                max = Collections.max(timestamp);
+                min = Collections.min(timestamp);
+                collector.collect(new Tuple7<Integer, Integer, Integer, Integer, Integer, Integer, Integer>
+                        (min, max, vid, xway, seg, dir, pos));
+            }
+            /*Iterator<Tuple8<Integer, Integer, Integer, Integer, Integer, Integer, Integer, Integer>> aux = iterable.iterator();
             int time1 = 0, time2 = 0, vid = 0, xway = 0, seg = 0, dir = 0, pos = 0;
             int cont = 0;
             for(Tuple8 item : iterable) {
@@ -182,7 +204,7 @@ public class VehicleTelematics {
             }
             if(cont == 4) {
                 collector.collect(new Tuple7<Integer,Integer,Integer,Integer,Integer,Integer,Integer>(time1, time2, vid, xway, seg, dir, pos));
-            }
+            }*/
         }
     }
 }
